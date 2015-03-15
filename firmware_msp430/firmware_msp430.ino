@@ -217,12 +217,10 @@ __interrupt void USCI0RX_ISR (void)
 #pragma vector=USCIAB0TX_VECTOR
 __interrupt void USCI0TX_ISR(void)
 {
-  /*
 while(!(IFG2 & UCA0TXIFG));    // USCI_A0 TX  buffer  ready (no interrupt flag) and input test not in progress
 UCA0TXBUF = 0xAA;              // Send 0xAA over SPI to Slave
 while(!(IFG2 & UCA0RXIFG));    // USCI_A0 RX  Received (no interrupt flag)
 received_data  =  UCA0RXBUF;   // Store received data
-*/
 }
 */
 
