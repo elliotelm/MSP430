@@ -168,13 +168,17 @@ __interrupt void Timer_A (void)
         CC_Shutdown = FALSE;                                          // coulomb counter doesn't need to be turned off
         digitalWrite(CC_SHTDWN, HIGH);                                // turn on coulomb counter
       }
-    if (!(BB_Power))                                                  // BB shutdown and is off // if BB takes longer than 1 min. to powerup and set BB shutdown pin high will need higher mod
+    if (!(BB_Power))                                                  // BB shutdown on its own and is off 
       {
         digitalWrite(BB_ON_OFF, LOW);                                 // turn off 5V boost
       }
+    if (BB_Power)                                                     // if BB is on
+      {
+        digitalWrite(BB_GP_ISR, HIGH);                                // tell BB to turn itself off
+      }
     Batt_Low_Check;                                                   // check to see if the battery is dangerously low
   }
-    
+  digitalWrite(BB_GP_ISR, LOW);                                       // turn off outputs to BB for safety
   BB_Pow_Check();                                                     // check to see if the BB is On or Off
      
  // TODO calculation for the situation in which battery went low, coulomb counter is off (need to manually adjust battery level for ?? hour(s) of charge)
