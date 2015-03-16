@@ -18,7 +18,7 @@
 #define FALSE 0
 
 #define BB_GP_ISR P2_3      // output pin 2.3 TO BB
-#define BB_ON_OFF P2_4      // output pin 2.4 TO BB
+#define BB_ON_OFF P2_4      // output pin 2.4 TO 5V boost/BB
 #define BB_Shutdown P2_5    // input pin 2.5 FROM BB
 
 #define CC_SHTDWN P2_0      // output pin 2.0 TO CC
@@ -45,7 +45,7 @@ void setup()
   
   // initialize pins and default pin states
   pinMode(BB_GP_ISR, OUTPUT);                       // output pin 2.3 TO BB
-  pinMode(BB_ON_OFF, OUTPUT);                       // output pin 2.4 TO BB
+  pinMode(BB_ON_OFF, OUTPUT);                       // output pin 2.4 TO 5V boost/BB
   pinMode(CC_SHTDWN, OUTPUT);                       // output pin 2.0 TO CC
   
   pinMode(BB_Shutdown, INPUT);                      // input pin 2.5 FROM BB
@@ -108,7 +108,7 @@ void Batt_Low_Check()
    {
      CC_Shutdown = TRUE;                           // CC needs to be shutdown
      CC_Pow_Check();                               // turn off coulomb counter
-     digitalWrite(BB_ON_OFF, LOW);                 // turn off BeagleBone  
+     digitalWrite(BB_ON_OFF, LOW);                 // turn off 5V boost/BeagleBone  
    }
 }// Batt_Low_Check
 
@@ -156,10 +156,10 @@ __interrupt void Timer_A (void)
   {
     if ((!(BB_Power)) && (Battery_Level >= Battery_BB_Min))         // BB is OFF and Battery has enough power for measurements
     {
-      digitalWrite(BB_ON_OFF, HIGH);                                // turn on the BeagleBone
+      digitalWrite(BB_ON_OFF, HIGH);                                // turn on the 5V boost/BeagleBone
       ISRA0count = 0;                                               // reset ISR count 
     }
-  }\
+  }
   
   if((ISRA0count % 60) == 0)                                          // if 1 min. has passed 
   {
@@ -167,9 +167,12 @@ __interrupt void Timer_A (void)
       {
         CC_Shutdown = FALSE;                                          // coulomb counter doesn't need to be turned off
         digitalWrite(CC_SHTDWN, HIGH);                                // turn on coulomb counter
-        // 
       }
-     Batt_Low_Check;                                                  // check to see if the battery is dangerously low
+    if (!(BB_Power))                                                  // BB shutdown and is off // if BB takes longer than 1 min. to powerup and set BB shutdown pin high will need higher mod
+      {
+        digitalWrite(BB_ON_OFF, LOW);                                 // turn off 5V boost
+      }
+    Batt_Low_Check;                                                   // check to see if the battery is dangerously low
   }
     
   BB_Pow_Check();                                                     // check to see if the BB is On or Off
