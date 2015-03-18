@@ -49,8 +49,8 @@ void setup()
   pinMode(CC_SHTDWN, OUTPUT);                       // output pin 2.0 TO CC
   
   pinMode(BB_Shutdown, INPUT);                      // input pin 2.5 FROM BB
-  pinMode(CC_POL, INPUT);                           // input pin 2.1 FROM CC
-  pinMode(CC_INT, INPUT);                           // input pin 2.2 FROM CC
+  pinMode(CC_POL, INPUT_PULLDOWN);                  // input pin 2.1 FROM CC pulldown resistors enabled
+  pinMode(CC_INT, INPUT_PULLDOWN);                  // input pin 2.2 FROM CC pulldown resistors enabled
   
   digitalWrite(BB_GP_ISR, LOW);                     // avoid damage to BeagleBone keep output low during powerup
   digitalWrite(BB_ON_OFF, LOW);                     // avoid damage to BeagleBone keep output low during powerup
@@ -118,11 +118,12 @@ void Batt_Low_Check()
 //*****************************************************************************************
 void BB_Pow_Check()              
 {
- if (BB_Shutdown)                                  // BeagleBone holds pin high to indicate it is on
+volatile int BBShutdown = (P2IN & BIT5);     // sets variable to pin register value p2.5
+ if (BBShutdown)                                  // BeagleBone holds pin high to indicate it is on
    {
      BB_Power = TRUE;                              // Beaglebone is ON
    }
- if (!(BB_Shutdown))                               // BeagleBone holds pin high to indicate it is on
+ if (!(BBShutdown))                               // BeagleBone holds pin high to indicate it is on
    {
      BB_Power = FALSE;                             // Beaglebone is OFF
    }
@@ -152,25 +153,22 @@ __interrupt void Timer_A (void)
   ISRA0count++;                                                     // count timerA0 overflows
   
   //if((ISRA0count % 3600) == 0)                                     // if 1 hour has passed
-  if((ISRA0count % 60) == 0)                                        // if 1 min. has passed (remove for final firmware)
+  if((ISRA0count % 120) == 0)                                        // if 1 min. has passed (remove for final firmware)
   {
     if ((!(BB_Power)) && (Battery_Level >= Battery_BB_Min))         // BB is OFF and Battery has enough power for measurements
-    {
+   {
       digitalWrite(BB_ON_OFF, HIGH);                                // turn on the 5V boost/BeagleBone
       ISRA0count = 0;                                               // reset ISR count 
     }
   }
   
-  if((ISRA0count % 60) == 0)                                          // if 1 min. has passed 
+  if(((ISRA0count % 59) == 0) && (ISRA0count > 1))                     // if 1 min. has passed 
   {
+   // Battery_Level = 9;                                                // simulate battery went low
     if ((Battery_Level > Battery_Low_Threshold) && (CC_Shutdown))     // CC is OFF and Battery is above absolute minimum
       {
         CC_Shutdown = FALSE;                                          // coulomb counter doesn't need to be turned off
         digitalWrite(CC_SHTDWN, HIGH);                                // turn on coulomb counter
-      }
-    if (!(BB_Power))                                                  // BB shutdown on its own and is off 
-      {
-        digitalWrite(BB_ON_OFF, LOW);                                 // turn off 5V boost
       }
     if (BB_Power)                                                     // if BB is on
       {
@@ -178,6 +176,11 @@ __interrupt void Timer_A (void)
       }
     Batt_Low_Check;                                                   // check to see if the battery is dangerously low
   }
+  if(((ISRA0count % 29) == 0) && (ISRA0count > 1))                     // if 30sec. has passed
+      if (!(BB_Power))                                               // BB shutdown on its own and is off 
+      {
+        digitalWrite(BB_ON_OFF, LOW);                                 // turn off 5V boost
+      }
   digitalWrite(BB_GP_ISR, LOW);                                       // turn off outputs to BB for safety
   BB_Pow_Check();                                                     // check to see if the BB is On or Off
      
@@ -193,7 +196,7 @@ __interrupt void Timer_A (void)
 //*****************************************************************************************
 #pragma vector=PORT2_VECTOR
 __interrupt void Port_2(void)
-{    
+{   
   // TODO update the battery charge variables here
   if (CC_POL)                                                      // coulomb counter indicates charging
     {
@@ -217,7 +220,7 @@ __interrupt void Port_2(void)
 #pragma vector=USCIAB0RX_VECTOR
 __interrupt void USCI0RX_ISR (void)
 {
-// UCA0TXBUF is read by the BeagleBone, the interrupt is cleared 
+ //UCA0TXBUF is read by the BeagleBone, the interrupt is cleared 
 }
 // transfer should not be necessary for slave
 /*
