@@ -58,9 +58,9 @@ void setup()
   
   spi_init();                                        // initialize spi
  
-  P2IE |= BIT2;                                     // P2.2 interrupt enabled, CC_INT
-  P1IES |= BIT2;                                    // P2.2 Hi/lo edge (fires on hi/lo transition)
-  P1IFG &= ~BIT2;                                   // P2.2 IFG cleared, clear the flag
+  //P2IE |= BIT2;                                     // P2.2 interrupt enabled, CC_INT
+  //P2IES |= BIT2;                                  //P1IES  // P2.2 Hi/lo edge (fires on hi/lo transition)
+  //P2IFG &= ~BIT2;                                 //P1IFG // P2.2 IFG cleared, clear the flag
 }
 
 //*****************************************************************************************
@@ -71,15 +71,28 @@ void spi_init(void)
 {
 // TODO fix the SPI init to setup as a slave to the BB
 // start the SPI library
-SPI.begin(); 
+//SPI.begin(); 
+ /* Configure CS and SPI 3-pin mode */
+  P1DIR &= ~BIT5;
+  P1OUT |= BIT5;
+  P1REN |= BIT5;
+  P1IES |= BIT5;  // Falling edge
+  P1IFG &= ~BIT5;
+  P1IE |= BIT5;
+
+  // Configure SPI function
+  P1SEL |= BIT1 + BIT2 + BIT4;
+  P1SEL2 |= BIT1 + BIT2 + BIT4;
 
 UCA0CTL1 = UCSWRST;                                 // hold in reset
                                                     // 4-pin, 8-bit SPI slave, STE (slave enable) active high
-UCA0CTL0 |= UCCKPH + UCMSB + UCMODE_1 + UCSYNC;     // Sync. Mode: Clock Phase, Async. Mode: MSB first  0:LSB / 1:MSB, Sync. Mode: USCI Mode: 1, Sync-Mode  0:UART-Mode / 1:SPI-Mode
+//UCA0CTL0 |= UCCKPH + UCMSB + UCMODE_1 + UCSYNC;     // Sync. Mode: Clock Phase, Async. Mode: MSB first  0:LSB / 1:MSB, Sync. Mode: USCI Mode: 1, Sync-Mode  0:UART-Mode / 1:SPI-Mode
+UCA0CTL0 |= UCCKPH + UCMSB + UCSYNC;    
 // UCxCLK is always used in slave mode
+UCA0CTL1 &= ~UCSWRST;                               // release reset
 IE2 |= UCA0RXIE;                                    // USCI_A0 receive interrupt enable
 //IE2 |= UCA0TXIE;                                  // USCI_A0 transmit interrupt enable
-UCA0CTL1 &= ~UCSWRST;                               // release reset
+_BIS_SR(GIE);			                    // Active mode w/ interrupt
 }// spi_init
 
 //*****************************************************************************************
@@ -183,7 +196,7 @@ __interrupt void Timer_A (void)
       }
   digitalWrite(BB_GP_ISR, LOW);                                       // turn off outputs to BB for safety
   BB_Pow_Check();                                                     // check to see if the BB is On or Off
-     
+  UCA0TXBUF = 0x0A;                                      // TEST TEST // keep the battery level updated in the SPI data register 
  // TODO calculation for the situation in which battery went low, coulomb counter is off (need to manually adjust battery level for ?? hour(s) of charge)
 }//timer/counter A0 ISR
 
@@ -194,6 +207,7 @@ __interrupt void Timer_A (void)
 // direction.
 // 3600 mAh battery 
 //*****************************************************************************************
+/*
 #pragma vector=PORT2_VECTOR
 __interrupt void Port_2(void)
 {   
@@ -208,10 +222,10 @@ __interrupt void Port_2(void)
       CC_Fire -= Discharge_Step;                                   // decrement the battery charge
       // Battery_Level = ??                                        // calculate the battery charge percentage
     }
-   UCA0TXBUF = Battery_Level;                                      // keep the battery level updated in the SPI data register
+   // remove for TEST UCA0TXBUF = Battery_Level;                                      // keep the battery level updated in the SPI data register
    P2IFG &= ~BIT2;                                                 // P2.2 IFG (interrupt flag) cleared 
 }// PORT2 ISR
-
+*/
 //*****************************************************************************************
 // SPI ISR
 // receive 
@@ -220,19 +234,31 @@ __interrupt void Port_2(void)
 #pragma vector=USCIAB0RX_VECTOR
 __interrupt void USCI0RX_ISR (void)
 {
- //UCA0TXBUF is read by the BeagleBone, the interrupt is cleared 
+ //UCA0TXBUF is read by the BeagleBone, the interrupt is cleared
+ uint8_t blah = 0;
+ blah ^= 1;
+ if(blah)
+ {
+ pinMode(P1_0, OUTPUT);
+ digitalWrite(P1_0, HIGH);
+ }
+ else
+  pinMode(P1_0, OUTPUT);
+ digitalWrite(P1_0, LOW);
+ UCA0TXBUF = 0x0A;
+//IFG2 &= ~UCB0RXIFG;             // Clear USCI_B0 RX int flag 
 }
 // transfer should not be necessary for slave
-/*
-#pragma vector=USCIAB0TX_VECTOR
-__interrupt void USCI0TX_ISR(void)
-{
-while(!(IFG2 & UCA0TXIFG));    // USCI_A0 TX  buffer  ready (no interrupt flag) and input test not in progress
-UCA0TXBUF = 0xAA;              // Send 0xAA over SPI to Slave
-while(!(IFG2 & UCA0RXIFG));    // USCI_A0 RX  Received (no interrupt flag)
-received_data  =  UCA0RXBUF;   // Store received data
-}
-*/
+
+//#pragma vector=USCIAB0TX_VECTOR
+//__interrupt void USCI0TX_ISR(void)
+//{
+//while(!(IFG2 & UCA0TXIFG));    // USCI_A0 TX  buffer  ready (no interrupt flag) and input test not in progress
+//UCA0TXBUF = 0xAA;              // Send 0xAA over SPI to Slave
+//while(!(IFG2 & UCA0RXIFG));    // USCI_A0 RX  Received (no interrupt flag)
+//received_data  =  UCA0RXBUF;   // Store received data
+//}
+
 
 // MAIN
 // spend as much time as possible doing nothing otherwise everything else is handled by ISRs
